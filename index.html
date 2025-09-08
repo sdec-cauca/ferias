@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Ejecutivo - Proyecto de comercialización y ferias</title>
+    
+    <!-- Librerías para generar PDF y Gráficos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #0d47a1; --secondary-color: #e3f2fd; --text-color: #333;
+            --card-bg-color: #ffffff; --shadow-color: rgba(0, 0, 0, 0.1); --accent-color-1: #42a5f5;
+            --accent-color-2: #ef5350; --hero-color: #2e7d32;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8f9fa; color: var(--text-color); margin: 0;
+            padding: 20px; box-sizing: border-box;
+        }
+        .dashboard-container { display: grid; grid-template-columns: 1fr; gap: 25px; max-width: 1400px; margin: auto; }
+        .header {
+            grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 15px; background: linear-gradient(90deg, var(--primary-color), var(--accent-color-1));
+            color: white; padding: 20px 30px; border-radius: 12px; box-shadow: 0 4px 15px var(--shadow-color);
+        }
+        .header h1 { margin: 0; font-size: 2.2em; font-weight: 600; }
+        #download-btn {
+            background-color: #ffffff; color: var(--primary-color); border: none; padding: 10px 20px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex-shrink: 0;
+        }
+        #download-btn:hover { background-color: var(--secondary-color); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .card { background-color: var(--card-bg-color); padding: 25px; border-radius: 12px; box-shadow: 0 4px 8px var(--shadow-color); transition: transform 0.3s ease-in-out; }
+        .card:hover { transform: translateY(-5px); }
+        .card-title { margin-top: 0; margin-bottom: 20px; font-size: 1.3em; color: var(--primary-color); border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .kpi-hero { grid-column: 1 / -1; text-align: center; background: linear-gradient(45deg, var(--hero-color), #4caf50); color: white; }
+        .kpi-hero .value { font-size: 4.5em; font-weight: 700; margin: 0; word-break: break-all; }
+        .kpi-hero .label { font-size: 1.5em; margin-top: 5px; opacity: 0.9; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .kpi { padding: 20px; text-align: center; border-left: 5px solid var(--accent-color-1); }
+        .kpi .value { font-size: 2.8em; font-weight: 700; color: var(--accent-color-1); }
+        .kpi .label { font-size: 1.1em; color: #555; margin-top: 5px; }
+        .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
+        .chart-container { position: relative; height: 400px; }
+        .table-container { overflow-x: auto; }
+        .table-container table { width: 100%; border-collapse: collapse; text-align: left; }
+        .table-container th, .table-container td { padding: 12px 15px; border-bottom: 1px solid #ddd; word-break: break-word; }
+        .table-container th { background-color: var(--primary-color); color: white; font-weight: 600; }
+        .table-container tbody tr:nth-child(even) { background-color: #f9f9f9; }
+        .table-container tbody tr:hover { background-color: var(--secondary-color); }
+        
+        /* --- ESTILOS PARA NUEVOS COMPONENTES --- */
+        .project-info-card { border-left: 5px solid var(--hero-color); }
+        .project-info-card h2 { font-size: 1.5em; color: var(--primary-color); margin-top: 0; }
+        .project-info-card p { margin: 5px 0 15px; font-size: 1.1em; }
+        .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .meta-item { background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .meta-item .label { font-weight: bold; color: var(--primary-color); display: block; margin-bottom: 5px; }
+        .meta-item .value { font-size: 1.8em; font-weight: 600; }
+        .progress-container { background-color: #e0e0e0; border-radius: 15px; overflow: hidden; height: 25px; margin-bottom: 5px; }
+        .progress-bar { background-color: var(--accent-color-1); width: 36%; height: 100%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .status-note { text-align: right; font-style: italic; color: var(--accent-color-2); font-weight: bold; }
+
+        .tabs-container { margin-top: 20px; }
+        .tab-buttons { display: flex; flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #ddd; }
+        .tab-button { padding: 12px 25px; cursor: pointer; background: none; border: none; font-size: 1.1em; font-weight: 600; color: #555; border-bottom: 3px solid transparent; transition: all 0.3s ease; }
+        .tab-button:hover { background-color: var(--secondary-color); }
+        .tab-button.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .tab-content { display: none; padding: 25px 5px; animation: fadeIn 0.5s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .accordion .accordion-item { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; overflow: hidden; }
+        .accordion-button { width: 100%; background-color: #f7f7f7; color: var(--primary-color); padding: 18px; text-align: left; border: none; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: background-color 0.3s; position: relative; }
+        .accordion-button::after { content: '+'; font-size: 1.5em; position: absolute; right: 20px; top: 50%; transform: translateY(-50%); transition: transform 0.3s ease; }
+        .accordion-button.active::after { transform: translateY(-50%) rotate(45deg); }
+        .accordion-button:hover { background-color: var(--secondary-color); }
+        .accordion-content { padding: 20px; background-color: white; display: none; }
+        .accordion-content h3 { font-size: 1.2em; color: var(--primary-color); margin-top: 0; }
+        .accordion-content p, .accordion-content li { line-height: 1.6; }
+        .accordion-content ul { padding-left: 20px; }
+        .asset-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center; margin-top: 15px; }
+        .asset-gallery img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 4px var(--shadow-color); }
+        
+        @media (max-width: 992px) { .charts-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            body { padding: 15px; } .header { flex-direction: column; text-align: center; }
+            .header h1 { font-size: 1.8em; } .kpi-hero .value { font-size: 3.5em; } .kpi-hero .label { font-size: 1.2em; }
+        }
+        @media (max-width: 480px) {
+            body { padding: 10px; } .card { padding: 15px; } .header { padding: 20px 15px; }
+            .header h1 { font-size: 1.5em; } .kpi-grid { grid-template-columns: 1fr; }
+            .kpi .value { font-size: 2.5em; } .kpi .label { font-size: 1em; }
+            .kpi-hero .value { font-size: 2.8em; } .kpi-hero .label { font-size: 1.1em; }
+            .chart-container { height: 350px; }
+            .tab-button { padding: 10px 15px; font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <header class="header"><h1>Dashboard: Proyecto de comercialización y ferias</h1><button id="download-btn">Descargar Informe PDF</button></header>
+        
+        <!-- --- INICIO DE LA NUEVA SECCIÓN: INFORMACIÓN DEL PROYECTO --- -->
+        <div class="card project-info-card">
+            <h2 class="card-title">Información General del Proyecto</h2>
+            <p><strong>NOMBRE DEL PROYECTO:</strong><br>FORTALECIMIENTO ECONÓMICO DE UNIDADES PRODUCTIVAS Y EMPRESAS MEDIANTE LA COMERCIALIZACIÓN EN MERCADOS INTERNOS Y EXTERNOS DEL DEPARTAMENTO DEL CAUCA</p>
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <span class="label">Meta de Producto 209</span>
+                    <span class="value">>250 asistencias técnicas</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Meta de Producto 210</span>
+                    <span class="value">147 empresas</span>
+                </div>
+            </div>
+            <div>
+                <strong>Ejecución Física:</strong>
+                <div class="progress-container">
+                    <div class="progress-bar">36%</div>
+                </div>
+                <p class="status-note">Retraso por operador logístico.</p>
+            </div>
+        </div>
+        <!-- --- FIN DE LA NUEVA SECCIÓN --- -->
+        
+        <div class="card kpi-hero"><div class="value" id="total-Asistidos-hero">0</div><div class="label">Total General de Asistidos</div></div>
+        <div class="card">
+            <h2 class="card-title">Asistencia por Mes</h2>
+            <div class="kpi-grid">
+                <div class="kpi"><div class="value" id="total-junio">0</div><div class="label">Asistidos en Junio</div></div>
+                <div class="kpi"><div class="value" id="total-julio">0</div><div class="label">Asistidos en Julio</div></div>
+                <div class="kpi"><div class="value" id="total-agosto">0</div><div class="label">Asistidos en Agosto</div></div>
+            </div>
+        </div>
+
+        <!-- --- INICIO DE LA NUEVA SECCIÓN: PROPUESTAS --- -->
+        <div class="card">
+            <h2 class="card-title">Planificación y Propuestas Estratégicas</h2>
+            <div class="tabs-container">
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="tab1">Propuesta de Fortalecimiento 2026</button>
+                    <button class="tab-button" data-tab="tab2">Propuesta Feria Digital 2025/2026</button>
+                </div>
+                <div id="tab1" class="tab-content active">
+                    <div class="accordion">
+                        <!-- Item 1 -->
+                        <div class="accordion-item">
+                            <button class="accordion-button">1. Descripción y Objetivo del Proyecto</button>
+                            <div class="accordion-content">
+                                <p>Continuando con el exitoso impulso al desarrollo económico de la región, esta propuesta para el año 2026 busca dar continuidad y expandir el alcance del "Proyecto de Fortalecimiento Económico de Unidades Productivas y Empresas". El objetivo es consolidar la presencia de los productos y servicios del Cauca en mercados locales, nacionales e internacionales, mejorando la competitividad y los ingresos de nuestros empresarios y productores.</p>
+                                <p>Este proyecto no solo busca mantener el impulso logrado, sino también profundizar su impacto mediante la incorporación de mejoras en áreas como merchandising, marketing, posicionamiento de marca, y comercio electrónico. Se trata de pasar de un modelo de apoyo puntual a uno de desarrollo integral, donde las capacidades locales se conviertan en motores de crecimiento económico duradero.</p>
+                                <p>El enfoque para 2026 se fundamenta en tres pilares: <strong>continuidad, eficiencia e innovación.</strong></p>
+                            </div>
+                        </div>
+                        <!-- Item 2 -->
+                        <div class="accordion-item">
+                            <button class="accordion-button">2. Plan de Inversión y Actividades Generales 2026</button>
+                            <div class="accordion-content">
+                                <p>El presupuesto total proyectado para 2026 es de <strong>$3.505.200.000 COP</strong>, ajustado para reflejar una inflación estimada del 4.5% sobre el presupuesto del año anterior y garantizar la viabilidad de las actividades. La inversión estará orientada a fortalecer capacidades productivas, mejorar procesos de comercialización, fomentar la innovación empresarial y ampliar el acceso a mercados.</p>
+                                <div class="table-container">
+                                    <table>
+                                        <thead>
+                                            <tr><th>Objetivo Específico</th><th>Actividad General</th><th>Inversión Proyectada 2026</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td colspan="2"><strong>1. Fortalecer la Comercialización de Productos y Servicios</strong></td><td></td></tr>
+                                            <tr><td></td><td>Brindar apoyo técnico, comercial y empresarial.</td><td style="text-align:right;">$214.800.000</td></tr>
+                                            <tr><td></td><td>Implementar escenarios de comercialización (ferias, etc.).</td><td style="text-align:right;">$1.030.370.000</td></tr>
+                                            <tr><td></td><td>Generar espacios que fomenten la inversión.</td><td style="text-align:right;">$1.228.000.000</td></tr>
+                                            <tr><td colspan="2" style="text-align:right; font-weight: bold;">Subtotal Objetivo 1</td><td style="text-align:right; font-weight: bold;">$2.473.170.000</td></tr>
+                                            <tr><td colspan="2"><strong>2. Mejorar la Formación e Incursión en Mercados</strong></td><td></td></tr>
+                                            <tr><td></td><td>Acompañamiento a empresas con potencial exportador.</td><td style="text-align:right;">$80.500.000</td></tr>
+                                            <tr><td></td><td>Implementar ciclos de formación exportadora.</td><td style="text-align:right;">$130.120.000</td></tr>
+                                            <tr><td></td><td>Incrementar participación en misiones comerciales.</td><td style="text-align:right;">$781.160.000</td></tr>
+                                            <tr><td></td><td>Gestionar la atracción de inversión extranjera (APRI).</td><td style="text-align:right;">$40.250.000</td></tr>
+                                            <tr><td colspan="2" style="text-align:right; font-weight: bold;">Subtotal Objetivo 2</td><td style="text-align:right; font-weight: bold;">$1.032.030.000</td></tr>
+                                            <tr><td colspan="2" style="text-align:right; font-weight: bold; font-size: 1.1em;">TOTAL PROYECTO</td><td style="text-align:right; font-weight: bold; font-size: 1.1em;">$3.505.200.000</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Item 3 -->
+                        <div class="accordion-item">
+                            <button class="accordion-button">3. Inversión Estratégica en Activos: Compra vs. Alquiler</button>
+                            <div class="accordion-content">
+                                <h3>Justificación Técnica y Operativa</h3>
+                                <p>La dependencia de operadores logísticos para el alquiler de equipos (carpas, mesas, silletería) ha generado retrasos e ineficiencias. La compra de estos activos representa un ahorro a largo plazo y nos otorga <strong>autonomía operativa total</strong>. Esto permitirá organizar eventos con mayor rapidez, reducir costos y asegurar la disponibilidad de infraestructura, convirtiendo estos bienes en un patrimonio para el Departamento.</p>
+                                <h3>Propuesta de Adquisición de Activos</h3>
+                                <div class="table-container">
+                                    <table>
+                                        <thead><tr><th>Ítem</th><th>Cantidad</th><th>Valor Total (Incl. 30%)</th></tr></thead>
+                                        <tbody>
+                                            <tr><td>Silla (tipo Rimax o similar)</td><td>100</td><td style="text-align:right;">$6.030.600</td></tr>
+                                            <tr><td>Mesa plegable tipo maleta (180 cm)</td><td>50</td><td style="text-align:right;">$10.725.000</td></tr>
+                                            <tr><td>Carpa plegable 6×3 m</td><td>12</td><td style="text-align:right;">$6.708.000</td></tr>
+                                            <tr><td>Carpa plegable 3×4,5 m</td><td>15</td><td style="text-align:right;">$6.630.000</td></tr>
+                                            <tr><td>Separadores de madera plastica</td><td>N/A</td><td>N/A</td></tr>
+                                            <tr><td>Manteles en lona con estampados institucionales</td><td>50</td><td>N/A</td></tr>
+                                            <tr><td colspan="2" style="text-align:right; font-weight: bold;">TOTAL INVERSIÓN EN ACTIVOS</td><td style="text-align:right; font-weight: bold;">$30.093.600</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- <h4>Imágenes ilustrativas de los insumos:</h4>
+                                <div class="asset-gallery">
+                                    <div><img src="https://placehold.co/200x200/e0e0e0/333?text=Silla" alt="Silla"><p>Silla</p></div>
+                                    <div><img src="https://placehold.co/250x200/e0e0e0/333?text=Mesa+Plegable" alt="Mesa Plegable"><p>Mesa Plegable</p></div>
+                                    <div><img src="https://placehold.co/300x200/e0e0e0/333?text=Carpa" alt="Carpa"><p>Carpa Plegable</p></div>
+                                    <div><img src="https://placehold.co/250x250/e0e0e0/333?text=Separador+(IA)" alt="Separador de madera"><p>Separador (Biombo)</p></div>
+                                    <div><img src="https://placehold.co/250x250/e0e0e0/333?text=Mantel+(IA)" alt="Mantel de lona"><p>Mantel Estampado</p></div>
+                                </div> -->
+                            </div>
+                        </div>
+                        <!-- Item 4 -->
+                        <div class="accordion-item">
+                            <button class="accordion-button">4. Componentes Adicionales para un Mayor Impacto en 2026</button>
+                            <div class="accordion-content">
+                                <p>Para elevar el alcance y la sostenibilidad del proyecto, proponemos integrar las siguientes iniciativas innovadoras:</p>
+                                <ul>
+                                    <li><strong>Marketplace Digital "Compra Caucano":</strong> Creación de una plataforma de e-commerce para ofrecer un canal de ventas permanente (24/7) y acceso a un mercado global.</li>
+                                    <li><strong>Programa de Sellos de Calidad y Origen "Hecho en Cauca":</strong> Desarrollo de un sello de certificación para garantizar calidad y autenticidad, agregando valor y abriendo puertas a mercados premium.</li>
+                                    <li><strong>Incubadora de Negocios para la Exportación:</strong> Programa intensivo para 10 empresas con alto potencial, ofreciendo mentoría personalizada para lograr su primera venta internacional.</li>
+                                    <li><strong>Rutas Comerciales Digitalizadas:</strong> Creación de recorridos virtuales interactivos y catálogos en línea para que compradores y turistas exploren la oferta del Cauca desde cualquier lugar.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="tab2" class="tab-content">
+                     <h3>Propuesta: Feria Virtual de Unidades Productivas del Departamento del Cauca</h3>
+                     <p><strong>Contexto:</strong> Debido a la situación de seguridad, no es posible realizar actividades presenciales en municipios del Macizo Colombiano. Se ha decidido adelantar la propuesta de implementación de una feria virtual este año 2025 como una estrategia preventiva y adaptativa.</p>
+                     <h4>Objetivo General</h4>
+                     <p>Diseñar e implementar una feria virtual interactiva que visibilice, promueva y comercialice los productos y servicios de las unidades productivas del Cauca, integrando herramientas digitales para ampliar el alcance comercial.</p>
+                      <h4>Justificación</h4>
+                     <p>Una feria virtual minimiza riesgos, elimina barreras geográficas, ofrece un canal de ventas permanente, promueve la transformación digital y fortalece la marca territorial "Hecho en Cauca".</p>
+                     <h4>Componentes de la Feria Virtual</h4>
+                     <div class="table-container">
+                        <table>
+                            <thead><tr><th>Componente</th><th>Descripción</th></tr></thead>
+                            <tbody>
+                                <tr><td><strong>Marketplace Digital “Compra Caucano”</strong></td><td>Plataforma de e-commerce con tienda virtual personalizada para cada unidad productiva.</td></tr>
+                                <tr><td><strong>Pabellones temáticos virtuales</strong></td><td>Espacios digitales por sectores (agroindustria, artesanías, etc.) con recorridos interactivos.</td></tr>
+                                <tr><td><strong>Agenda académica y cultural</strong></td><td>Charlas, talleres y presentaciones transmitidas en vivo y en diferido.</td></tr>
+                                <tr><td><strong>Networking y ruedas de negocio</strong></td><td>Espacios virtuales para conectar productores con compradores e inversionistas.</td></tr>
+                                <tr><td><strong>Certificación “Hecho en Cauca”</strong></td><td>Distintivo digital que acompaña cada producto, reforzando su autenticidad.</td></tr>
+                                <tr><td><strong>Rutas Comerciales Digitalizadas</strong></td><td>Mapas interactivos para explorar la oferta del Cauca por regiones y productos.</td></tr>
+                            </tbody>
+                        </table>
+                     </div>
+                     <h4>Resultados Esperados</h4>
+                     <ul>
+                         <li>Aumento del volumen de ventas y visibilidad de las unidades productivas.</li>
+                         <li>Fortalecimiento de la identidad regional y del sello “Hecho en Cauca”.</li>
+                         <li>Generación de alianzas comerciales nacionales e internacionales.</li>
+                         <li>Posicionamiento del Cauca como referente de innovación territorial.</li>
+                     </ul>
+                </div>
+            </div>
+        </div>
+        <!-- --- FIN DE LA NUEVA SECCIÓN --- -->
+
+
+        <div class="charts-grid">
+            <div class="card"><h2 class="card-title">Asistencia por Evento</h2><div class="chart-container"><canvas id="asistenciaPorEvento"></canvas></div></div>
+            <div class="card"><h2 class="card-title">Distribución por Género</h2><div class="chart-container"><canvas id="distribucionGenero"></canvas></div></div>
+        </div>
+        <div class="card table-container">
+            <h2 class="card-title">Detalle de Actividades</h2>
+            <table>
+                <thead><tr><th>Actividad</th><th>Hombres</th><th>Mujeres</th><th>Total</th></tr></thead>
+                <tbody id="tabla-actividades"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const csvData = `COMPONENTE;NOMBRE DEL PROYECTO;NOMBRE ACTIVIDAD;FECHA;MUNICIPIO;VEREDA;HOMBRE;MUJER;TOTAL ATENCION
+FOMENTO ECONOMICO;FORTALECIMIENTO;EXPOCAUCA;JUNIO;;;83;0;83
+FOMENTO ECONOMICO;FORTALECIMIENTO;FERIA CAFE ESPECIALES;18/07/2025;Morales;;9;56;65
+FOMENTO ECONOMICO;FORTALECIMIENTO;ENCUENTRO DEPARTAMENTAL AGROPECUARIO 2025;6/07/2025;Popayán;;26;127;153
+FOMENTO ECONOMICO;FORTALECIMIENTO;ASISTENCIA TECNICA EN FORMALIZACION;11/08/2025;Silvia;;14;19;33
+FOMENTO ECONOMICO;FORTALECIMIENTO;CAUCA SABE A CAFÉ;15/08/2025;Popayán;;16;20;36
+FOMENTO ECONOMICO;FORTALECIMIENTO;FERIA ESCUELA Y CAFE;15/08/2025;Piendamó;;4;5;9
+FOMENTO ECONOMICO;FORTALECIMIENTO;TALLER DE ASOCIATIVIDAD;19/08/2025;Popayán;;11;18;29
+FOMENTO ECONOMICO;FORTALECIMIENTO;POPAYÁN FASHION WEEK;22/08/2023;Popayán;;5;18;23
+FOMENTO ECONOMICO;FORTALECIMIENTO;ASTENCIA TECNICA RUNIN;22/08/2023;Balboa;;2;7;9
+FOMENTO ECONOMICO;FORTALECIMIENTO;EVENTO DIA DEL BARBERO;25/08/2025;Popayán;;115;60;175`;
+        
+        const rows = csvData.trim().split('\n').slice(1);
+        const data = rows.map(row => { const cols = row.split(';'); return { actividad: cols[2], fecha: cols[3], hombres: parseInt(cols[6])||0, mujeres: parseInt(cols[7])||0, total: parseInt(cols[8])||0 }; });
+        let totalJunio = 0, totalJulio = 0, totalAgosto = 0, totalHombres = 0, totalMujeres = 0, totalGeneral = 0;
+        data.forEach(item => {
+            if (item.fecha.toUpperCase().includes('JUNIO')) totalJunio += item.total;
+            else if (item.fecha.includes('/07/')) totalJulio += item.total;
+            else if (item.fecha.includes('/08/')) totalAgosto += item.total;
+            totalHombres += item.hombres; totalMujeres += item.mujeres; totalGeneral += item.total;
+        });
+
+        document.getElementById('total-Asistidos-hero').innerText = totalGeneral.toLocaleString();
+        document.getElementById('total-junio').innerText = totalJunio.toLocaleString();
+        document.getElementById('total-julio').innerText = totalJulio.toLocaleString();
+        document.getElementById('total-agosto').innerText = totalAgosto.toLocaleString();
+        const tablaBody = document.getElementById('tabla-actividades');
+        data.forEach(item => { tablaBody.innerHTML += `<tr><td>${item.actividad}</td><td>${item.hombres.toLocaleString()}</td><td>${item.mujeres.toLocaleString()}</td><td><strong>${item.total.toLocaleString()}</strong></td></tr>`; });
+
+        Chart.defaults.font.family = "'Segoe UI', 'system-ui', 'Helvetica Neue', 'Arial', 'sans-serif'";
+        const barChart = new Chart(document.getElementById('asistenciaPorEvento'), { type: 'bar', data: { labels: data.map(item => item.actividad), datasets: [{ data: data.map(item => item.total), backgroundColor: 'rgba(13, 71, 161, 0.8)', borderWidth: 1, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } } });
+        const doughnutChart = new Chart(document.getElementById('distribucionGenero'), { type: 'doughnut', data: { labels: ['Hombres', 'Mujeres'], datasets: [{ data: [totalHombres, totalMujeres], backgroundColor: ['rgba(66, 165, 245, 0.9)', 'rgba(239, 83, 80, 0.9)'], borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } } });
+
+        document.getElementById('download-btn').addEventListener('click', () => downloadPDF());
+
+        function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            
+        const logoBase64 = 'data:image/png;base64,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';
+            const pageWidth = doc.internal.pageSize.getWidth(), pageHeight = doc.internal.pageSize.getHeight(), margin = 15;
+            let startY = 30;
+            const primaryColor = '#0d47a1', headerColor = '#1a252f', textColor = '#333333';
+
+            const addHeaderFooter = () => {
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i); doc.setFillColor(headerColor); doc.rect(0, 0, pageWidth, 25, 'F');
+                    if (logoBase64) {
+                        const br = 3, pad = 2, w = 20, r = 2, h = w / r, bw = w + (pad*2), bh = h + (pad*2);
+                        const bx = margin, by = (25 - bh) / 2, lx = bx + pad, ly = by + pad;
+                        doc.setFillColor('#FFFFFF'); doc.roundedRect(bx, by, bw, bh, br, br, 'F');
+                        doc.addImage(logoBase64, 'PNG', lx, ly, w, h);
+                    }
+                    doc.setFontSize(12); doc.setTextColor('#FFFFFF'); doc.setFont('helvetica', 'bold');
+                    doc.text("Informe Ejecutivo: Proyecto de comercialización y ferias", pageWidth / 2, 15, { align: 'center' });
+                    doc.setFontSize(8); doc.setTextColor('#777');
+                    doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+                }
+            };
+            
+            doc.setFontSize(18); doc.setTextColor(primaryColor); doc.setFont('helvetica', 'bold'); doc.text("Resumen de Actividades", margin, startY); startY += 8;
+            doc.setFontSize(10); doc.setTextColor(textColor); doc.setFont('helvetica', 'normal'); doc.text(`Fecha del informe: ${new Date().toLocaleDateString()}`, margin, startY); startY += 15;
+            
+            doc.setFontSize(14); doc.setTextColor(primaryColor); doc.setFont('helvetica', 'bold'); doc.text("Puntos Clave", margin, startY); startY += 8;
+            const kpiData = [
+                { label: 'Total Asistidos', value: totalGeneral.toLocaleString(), color: '#2e7d32' },
+                { label: 'Asistidos Junio', value: totalJunio.toLocaleString(), color: '#42a5f5' },
+                { label: 'Asistidos Julio', value: totalJulio.toLocaleString(), color: '#42a5f5' },
+                { label: 'Asistidos Agosto', value: totalAgosto.toLocaleString(), color: '#42a5f5' }
+            ];
+            const cardWidth = (pageWidth - (margin * 2) - (10 * (kpiData.length - 1))) / kpiData.length;
+            const cardHeight = 30; let currentX = margin;
+            kpiData.forEach(kpi => {
+                doc.setFillColor('#F8F9FA'); doc.setDrawColor(kpi.color); doc.setLineWidth(0.5);
+                doc.roundedRect(currentX, startY, cardWidth, cardHeight, 3, 3, 'FD');
+                doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor(kpi.color);
+                doc.text(kpi.value, currentX + cardWidth / 2, startY + 15, { align: 'center' });
+                doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor('#333333');
+                doc.text(kpi.label, currentX + cardWidth / 2, startY + 23, { align: 'center' });
+                currentX += cardWidth + 10;
+            });
+            startY += cardHeight + 15;
+
+            doc.setFontSize(14); doc.setTextColor(primaryColor); doc.setFont('helvetica', 'bold'); doc.text("Visualización de Datos", margin, startY); startY += 8;
+            try {
+                const barChartImg = barChart.canvas.toDataURL('image/png', 1.0);
+                const doughnutChartImg = doughnutChart.canvas.toDataURL('image/png', 1.0);
+                const chartWidth = pageWidth - (margin * 2);
+                const barChartHeight = (barChart.canvas.height / barChart.canvas.width) * chartWidth;
+                if (startY + barChartHeight > pageHeight - 20) { doc.addPage(); startY = 30; }
+                doc.addImage(barChartImg, 'PNG', margin, startY, chartWidth, barChartHeight); startY += barChartHeight + 10;
+                const doughnutSize = 70;
+                if (startY + doughnutSize > pageHeight - 20) { doc.addPage(); startY = 30; }
+                doc.addImage(doughnutChartImg, 'PNG', (pageWidth - doughnutSize) / 2, startY, doughnutSize, doughnutSize); startY += doughnutSize + 15;
+            } catch(e) { doc.text("Error: No se pudieron cargar las gráficas.", margin, startY); startY += 10; }
+            
+            if (startY > pageHeight - 40) { doc.addPage(); startY = 30; }
+
+            doc.setFontSize(14); doc.setTextColor(primaryColor); doc.setFont('helvetica', 'bold'); doc.text("Tabla de Datos Detallada", margin, startY); startY += 10;
+            const tableBody = data.map(item => [item.actividad, item.hombres.toLocaleString(), item.mujeres.toLocaleString(), item.total.toLocaleString()]);
+            doc.autoTable({
+                startY: startY, head: [['Nombre de la Actividad', 'Hombres', 'Mujeres', 'Total']],
+                body: tableBody, theme: 'grid',
+                headStyles: { fillColor: primaryColor, textColor: '#FFFFFF', fontStyle: 'bold', halign: 'center' },
+                columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center', fontStyle: 'bold' } }
+            });
+
+            addHeaderFooter();
+            doc.save(`Informe_Ferias_${new Date().toISOString().slice(0,10)}.pdf`);
+        }
+
+        /* --- SCRIPT PARA COMPONENTES INTERACTIVOS --- */
+        document.addEventListener('DOMContentLoaded', () => {
+            // Lógica para las Pestañas (Tabs)
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(button.dataset.tab).classList.add('active');
+                });
+            });
+
+            // Lógica para el Acordeón
+            const accordionButtons = document.querySelectorAll('.accordion-button');
+            
+            accordionButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const content = button.nextElementSibling;
+                    button.classList.toggle('active');
+
+                    if (content.style.display === 'block') {
+                        content.style.display = 'none';
+                    } else {
+                        content.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
